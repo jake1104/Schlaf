@@ -1,10 +1,29 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Schlaf — Schläfli renderer</title>
 <meta name="description" content="Type a Schläfli symbol and render the polytope: any dimension, Euclidean, spherical or hyperbolic." />
+<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+<meta name="theme-color" content="#f2f3f4" />
+<meta property="og:title" content="Schlaf — Schläfli renderer" />
+<meta property="og:description" content="Type a Schläfli symbol and render the polytope in any dimension: Euclidean, spherical or hyperbolic." />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Schlaf" />
+<meta property="og:locale" content="en_US" />
+<meta property="og:locale:alternate" content="ko_KR" />
+<meta property="og:url" content="https://jake1104.github.io/Schlaf/" />
+<meta property="og:image" content="https://jake1104.github.io/Schlaf/og.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Schlaf interface with a rendered cube" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Schlaf — Schläfli renderer" />
+<meta name="twitter:description" content="Type a Schläfli symbol and render the polytope in any dimension." />
+<meta name="twitter:image" content="https://jake1104.github.io/Schlaf/og.png" />
+<meta name="twitter:image:alt" content="Schlaf interface with a rendered cube" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+KR:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -14,44 +33,53 @@
 <header class="masthead">
 <div class="masthead-title">
 <h1>Schlaf</h1>
-<p>슐레플리 기호</p>
+<p data-i18n="subtitle">Schläfli symbol renderer</p>
+</div>
+<div class="header-tools">
+<button type="button" class="header-button" id="copyLink" data-i18n="copyLink">Copy link</button>
+<span id="copyStatus" class="sr-only" role="status" aria-live="polite"></span>
+<div class="lang-switch" role="group" aria-label="Language">
+<button type="button" data-lang="en" class="is-active" aria-label="English" aria-pressed="true">EN</button>
+<button type="button" data-lang="ko" aria-label="한국어" aria-pressed="false">KO</button>
+</div>
 </div>
 </header>
 <main>
 <aside class="panel">
 <section class="group">
-<h2 class="group-title"><span>Specimen</span></h2>
-<label class="field-label" for="expr">슐레플리 기호</label>
+<h2 class="group-title" data-i18n="specimen">Specimen</h2>
+<label class="field-label" for="expr" data-i18n="field">Schläfli symbol</label>
 <input id="expr" class="symbol-input" value="{4,3}" spellcheck="false" autocomplete="off" autocapitalize="off" />
 <p class="reading" id="reading"></p>
 <p class="error" id="err" role="alert"></p>
 </section>
 <section class="group">
-<h2 class="group-title"><span>View</span></h2>
+<h2 class="group-title" data-i18n="view">View</h2>
 <div class="control-stack">
-<label for="proj">투영</label>
-<select id="proj"><option value="perspective">원근</option><option value="stereographic">입체투영</option></select>
+<label for="proj" data-i18n="projection">Projection</label>
+<select id="proj"><option value="perspective" data-i18n="perspective">Perspective</option><option value="stereographic" data-i18n="stereographic">Stereographic</option></select>
 </div>
-<label class="check"><span>쌍곡면</span><input id="hyper" type="checkbox" /></label>
-<label class="check"><span>자동회전</span><input id="spin" type="checkbox" checked /></label>
+<label class="check"><span data-i18n="hyperboloid">Hyperboloid</span><input id="hyper" type="checkbox" /></label>
+<label class="check"><span data-i18n="autoRotate">Auto-rotate</span><input id="spin" type="checkbox" checked /></label>
+<button type="button" class="action-button" id="resetView" data-i18n="resetView">Reset view</button>
 </section>
 <section class="group">
-<h2 class="group-title"><span>Appearance</span></h2>
-<label class="check"><span>면 표시</span><input id="showFaces" type="checkbox" checked /></label>
+<h2 class="group-title" data-i18n="appearance">Appearance</h2>
+<label class="check"><span data-i18n="faces">Faces</span><input id="showFaces" type="checkbox" checked /></label>
 <div class="control">
-<label for="faceColor">면 색상</label>
+<label for="faceColor" data-i18n="faceColor">Face color</label>
 <input id="faceColor" type="color" value="#1D5FBF" />
 </div>
 <div class="control-stack">
-<div class="control-row"><label for="faceOpacity">면 불투명도</label><output id="faceOpacityOut" for="faceOpacity">0.55</output></div>
+<div class="control-row"><label for="faceOpacity" data-i18n="faceOpacity">Face opacity</label><output id="faceOpacityOut" for="faceOpacity">0.55</output></div>
 <input id="faceOpacity" type="range" min="0" max="1" step="0.01" value="0.55" />
 </div>
-<label class="check"><span>간선 표시</span><input id="showEdges" type="checkbox" checked /></label>
+<label class="check"><span data-i18n="edges">Edges</span><input id="showEdges" type="checkbox" checked /></label>
 </section>
 <section class="group">
-<h2 class="group-title"><span>Rotation</span></h2>
+<h2 class="group-title" data-i18n="rotation">Rotation</h2>
 <div class="control-stack">
-<div class="control-row"><label for="range">타일링 범위</label><output id="rangeOut" for="range">3</output></div>
+<div class="control-row"><label for="range" data-i18n="tilingRange">Tiling range</label><output id="rangeOut" for="range">3</output></div>
 <input id="range" type="range" min="1" max="4" step="1" value="3" />
 </div>
 <div class="control-stack">
@@ -68,7 +96,11 @@
 </div>
 </section>
 <section class="group">
-<h2 class="group-title"><span>Catalogue</span></h2>
+<h2 class="group-title" data-i18n="catalogue">Catalogue</h2>
+<div class="preset-group">
+<h3 data-i18n="highlights">Highlights</h3>
+<div class="gallery" id="gallery"></div>
+</div>
 <div class="presets" id="presets"></div>
 </section>
 </aside>
@@ -77,11 +109,11 @@
 <div class="plate"><canvas id="c"></canvas></div>
 <figcaption class="plate-caption">
 <div class="caption-line">
-<span class="caption-label">Plate</span>
+<span class="caption-label" data-i18n="plate">Plate</span>
 <span class="caption-symbol" id="plateSymbol">{4,3}</span>
 <span class="caption-stats" id="info"></span>
 </div>
-<span class="caption-hint">드래그 회전 · 휠 줌 · 우드래그 이동</span>
+<span class="caption-hint" data-i18n="hint">Drag to rotate · Wheel to zoom · Right-drag to pan</span>
 </figcaption>
 </figure>
 </section>

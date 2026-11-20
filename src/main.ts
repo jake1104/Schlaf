@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildGeometry } from './geometry/builder';
 import { projectND, rotateND, toHyperboloid, type ProjMode } from './project/projection';
+import { describeError, localizeNote, pageTitle, STRINGS, type GroupKey, type Lang, type UiKey } from './i18n';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const exprEl = document.getElementById('expr') as HTMLInputElement;
@@ -16,41 +17,110 @@ const faceOpacityEl = document.getElementById('faceOpacity') as HTMLInputElement
 const showEdgesEl = document.getElementById('showEdges') as HTMLInputElement;
 const hyperEl = document.getElementById('hyper') as HTMLInputElement;
 const rangeEl = document.getElementById('range') as HTMLInputElement;
-const querySymbol = new URLSearchParams(location.search).get('s');
+const params = new URLSearchParams(location.search);
+const querySymbol = params.get('s');
 if (querySymbol) exprEl.value = querySymbol;
-if (new URLSearchParams(location.search).get('spin') === '0') spinEl.checked = false;
-if (new URLSearchParams(location.search).get('faces') === '0') showFacesEl.checked = false;
+if (params.get('spin') === '0') spinEl.checked = false;
+if (params.get('faces') === '0') showFacesEl.checked = false;
+if (params.get('edges') === '0') showEdgesEl.checked = false;
+if (params.get('proj') === 'stereographic') projEl.value = 'stereographic';
+hyperEl.checked = params.get('hyper') === '1';
+const rangeParam = params.get('range');
+if (rangeParam !== null) {
+  const value = Number(rangeParam);
+  if (Number.isFinite(value)) rangeEl.value = String(Math.min(4, Math.max(1, Math.round(value))));
+}
+for (const [el, name] of [[xwEl, 'xw'], [ywEl, 'yw'], [zwEl, 'zw']] as [HTMLInputElement, string][]) {
+  const raw = params.get(name);
+  if (raw === null) continue;
+  const value = Number(raw);
+  if (Number.isFinite(value)) el.value = String(Math.min(6.28, Math.max(0, value)));
+}
+const opacityParam = params.get('opacity');
+if (opacityParam !== null) {
+  const value = Number(opacityParam);
+  if (Number.isFinite(value)) faceOpacityEl.value = String(Math.min(1, Math.max(0, value)));
+}
+const faceParam = params.get('face');
+if (faceParam && /^#[0-9a-f]{6}$/i.test(faceParam)) faceColorEl.value = faceParam;
+let initialLang: Lang = 'en';
+const queryLang = params.get('lang');
+if (queryLang === 'ko' || queryLang === 'en') {
+  initialLang = queryLang;
+} else {
+  try {
+    const savedLang = localStorage.getItem('schlaf-lang');
+    if (savedLang === 'ko' || savedLang === 'en') initialLang = savedLang;
+  } catch {}
+}
+let currentLang: Lang = 'en';
+let copyTimer = 0;
+let sharedCam = false;
+
+function uiText(key: UiKey): string {
+  return STRINGS[currentLang][key];
+}
+
 const infoEl = document.getElementById('info')!;
 const errEl = document.getElementById('err')!;
 const readingEl = document.getElementById('reading')!;
 const plateSymbolEl = document.getElementById('plateSymbol')!;
 const presetsEl = document.getElementById('presets')!;
+const galleryEl = document.getElementById('gallery')!;
+const copyLinkEl = document.getElementById('copyLink') as HTMLButtonElement;
+const copyStatusEl = document.getElementById('copyStatus')!;
+const resetViewEl = document.getElementById('resetView') as HTMLButtonElement;
 
-const PRESET_GROUPS: [string, string[]][] = [
-  ['Polyhedra', ['{4,3}', 't{4,3}', 'r{4,3}', 'tr{4,3}', 'tt{4,3}', 's{4,3}', 's{5,3}', 'sr{5,3}', '{3,5}']],
-  ['Stars', ['{5/2}', '{5/2,5}', '{5,5/2}', '{5/2,3}', '{3,5/2}']],
-  ['Tilings', ['{4,4}', '{3,6}', '{6,3}', '{4,5}', '{3,7}']],
-  ['Spherical', ['{2,5}', '{5,2}', '{2,1}']],
-  ['Four-dimensional', ['{4,3,3}', '{3,3,4}', '{3,4,3}', '{4,3,4}', '{4,3,5}', '{3,5,3}', '{5,3,3}']],
-  ['Products & joins', ['{4}x{}', '{3}+{4}', '{4,3}v()', '{}v()', '{}v{}', '{}x{}', '{}+{}', 't{4}x{}']],
-  ['Special', ['E:{4,3,3}', 'H:{4,3,5}', 'H:{5,3,4}']],
+const PRESET_GROUPS: [GroupKey, string[]][] = [
+  ['polyhedra', ['{4,3}', 't{4,3}', 'r{4,3}', 'tr{4,3}', 'tt{4,3}', 's{4,3}', 's{5,3}', 'sr{5,3}', '{3,5}']],
+  ['stars', ['{5/2}', '{5/2,5}', '{5,5/2}', '{5/2,3}', '{3,5/2}']],
+  ['tilings', ['{4,4}', '{3,6}', '{6,3}', '{4,5}', '{3,7}']],
+  ['spherical', ['{2,5}', '{5,2}', '{2,1}']],
+  ['fourD', ['{4,3,3}', '{3,3,4}', '{3,4,3}', '{4,3,4}', '{4,3,5}', '{3,5,3}', '{5,3,3}']],
+  ['products', ['{4}x{}', '{3}+{4}', '{4,3}v()', '{}v()', '{}v{}', '{}x{}', '{}+{}', 't{4}x{}']],
+  ['special', ['E:{4,3,3}', 'H:{4,3,5}', 'H:{5,3,4}']],
 ];
-for (const [name, items] of PRESET_GROUPS) {
+for (const [key, items] of PRESET_GROUPS) {
   const group = document.createElement('div');
   group.className = 'preset-group';
   const title = document.createElement('h3');
-  title.textContent = name;
+  title.dataset.group = key;
+  title.textContent = STRINGS[currentLang].groups[key];
   const chips = document.createElement('div');
   chips.className = 'chips';
   for (const p of items) {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = p;
-    b.onclick = () => { exprEl.value = p; rebuild(); };
+    b.onclick = () => { exprEl.value = p; rebuild(); syncUrl(); };
     chips.appendChild(b);
   }
   group.append(title, chips);
   presetsEl.appendChild(group);
+}
+
+const GALLERY: [string, UiKey][] = [
+  ['{4,3}', 'galleryCube'],
+  ['{5/2,5}', 'galleryStar'],
+  ['{4,5}', 'galleryHyperbolic'],
+  ['{4,3,4}', 'galleryHoneycomb'],
+  ['{4,3,3}', 'galleryTesseract'],
+  ['{4,3}v()', 'galleryPyramid'],
+];
+for (const [symbol, key] of GALLERY) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'gallery-item';
+  button.dataset.gallery = key;
+  const sym = document.createElement('span');
+  sym.className = 'gallery-symbol';
+  sym.textContent = symbol;
+  const desc = document.createElement('span');
+  desc.className = 'gallery-desc';
+  desc.textContent = STRINGS[currentLang][key];
+  button.append(sym, desc);
+  button.onclick = () => { exprEl.value = symbol; rebuild(); syncUrl(); };
+  galleryEl.appendChild(button);
 }
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -68,10 +138,21 @@ controls.minDistance = 2;
 controls.maxDistance = 30;
 
 {
-  const cam = new URLSearchParams(location.search).get('cam');
+  const cam = params.get('cam');
   if (cam) {
     const [x, y, z] = cam.split(',').map(Number);
-    if ([x, y, z].every(Number.isFinite)) camera.position.set(x, y, z);
+    if ([x, y, z].every(Number.isFinite)) {
+      camera.position.set(x, y, z);
+      sharedCam = true;
+    }
+  }
+  const target = params.get('target');
+  if (target) {
+    const [x, y, z] = target.split(',').map(Number);
+    if ([x, y, z].every(Number.isFinite)) {
+      controls.target.set(x, y, z);
+      sharedCam = true;
+    }
   }
 }
 
@@ -123,6 +204,7 @@ let baseEdges: [number, number][] = [];
 let baseFaces: number[][] = [];
 let baseNote = '';
 let baseDim = 0;
+let baseError = '';
 let angle = 0;
 let fittedExpr = '';
 
@@ -133,28 +215,14 @@ function setHyperAvailable(available: boolean) {
   if (!available) hyperEl.checked = false;
   hyperRow?.classList.toggle('is-disabled', !available);
   if (hyperRow) {
-    hyperRow.title = available
-      ? '쌍곡 테셀레이션을 쌍곡면 위로 들어올립니다'
-      : '쌍곡 테셀레이션에서만 사용할 수 있습니다';
+    hyperRow.title = available ? uiText('hyperNoteOn') : uiText('hyperNoteOff');
   }
-}
-
-function describeNote(note: string): string {
-  if (note.startsWith('S ')) return `Spherical ${note.slice(2)}`;
-  if (note.startsWith('E ')) return `Euclidean ${note.slice(2)}`;
-  if (note.startsWith('H ')) return `Hyperbolic ${note.slice(2)}`;
-  return note;
-}
-
-function pageTitle(symbol: string, note: string, error: string): string {
-  if (error) return symbol ? `${symbol} · Invalid symbol — Schlaf` : 'Schlaf — Invalid symbol';
-  const summary = describeNote(note).split(' · ')[0].replace(/\s+\{?[\d/.,]+\}?\s*$/, '').trim();
-  if (!summary) return `${symbol} — Schlaf`;
-  return `${symbol} · ${summary.charAt(0).toUpperCase()}${summary.slice(1)} — Schlaf`;
 }
 
 function rebuild() {
   errEl.textContent = '';
+  errEl.removeAttribute('title');
+  baseError = '';
   let hyperAvailable = false;
   try {
     const g = buildGeometry(exprEl.value, { range: parseInt(rangeEl.value, 10) });
@@ -165,20 +233,24 @@ function rebuild() {
     baseDim = g.dim;
     hyperAvailable = g.space === 'H' && toHyperboloid(g.vertices) !== null;
   } catch (e: unknown) {
-    errEl.textContent = e instanceof Error ? e.message : String(e);
+    baseError = e instanceof Error ? e.message : String(e);
+    errEl.textContent = describeError(baseError, currentLang);
+    errEl.title = baseError;
     baseVerts = [];
     baseEdges = [];
     baseFaces = [];
     baseNote = '';
     baseDim = 0;
+    sharedCam = false;
   }
   setHyperAvailable(hyperAvailable);
-  readingEl.textContent = describeNote(baseNote);
+  readingEl.textContent = localizeNote(baseNote, currentLang);
   plateSymbolEl.textContent = exprEl.value || '—';
-  document.title = pageTitle(exprEl.value, baseNote, errEl.textContent ?? '');
+  document.title = pageTitle(exprEl.value, baseNote, errEl.textContent ?? '', currentLang);
   if (baseVerts.length && exprEl.value !== fittedExpr) {
     fittedExpr = exprEl.value;
-    fitView();
+    if (!sharedCam) fitView();
+    sharedCam = false;
   }
 }
 
@@ -267,11 +339,129 @@ function frame() {
     group.add(points);
   }
   scene.add(group);
-  const info = `dim ${baseDim} · V ${baseVerts.length} · E ${baseEdges.length} · T ${baseFaces.length} · ${lifted ? 'hyperboloid' : mode}`;
+  const modeLabel = projEl.selectedOptions[0]?.textContent ?? mode;
+  const info = `${uiText('dim')} ${baseDim} · V ${baseVerts.length} · E ${baseEdges.length} · T ${baseFaces.length} · ${lifted ? uiText('hyperboloid') : modeLabel}`;
   if (infoEl.textContent !== info) infoEl.textContent = info;
   resize();
   controls.update();
   renderer.render(scene, camera);
+}
+
+function applyLanguage(lang: Lang) {
+  currentLang = lang;
+  document.documentElement.lang = lang;
+  for (const el of document.querySelectorAll<HTMLElement>('[data-i18n]')) {
+    const key = el.dataset.i18n as UiKey | undefined;
+    if (key) el.textContent = STRINGS[lang][key];
+  }
+  for (const el of document.querySelectorAll<HTMLElement>('[data-group]')) {
+    const key = el.dataset.group as GroupKey | undefined;
+    if (key) el.textContent = STRINGS[lang].groups[key];
+  }
+  for (const el of document.querySelectorAll<HTMLElement>('[data-gallery]')) {
+    const key = el.dataset.gallery as UiKey | undefined;
+    const desc = el.querySelector<HTMLElement>('.gallery-desc');
+    if (key && desc) desc.textContent = STRINGS[lang][key];
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>('.lang-switch button')) {
+    const active = button.dataset.lang === lang;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', String(active));
+  }
+  window.clearTimeout(copyTimer);
+  copyLinkEl.textContent = STRINGS[lang].copyLink;
+  copyStatusEl.textContent = '';
+  if (baseError) {
+    errEl.textContent = describeError(baseError, lang);
+    errEl.title = baseError;
+  }
+  readingEl.textContent = localizeNote(baseNote, lang);
+  document.title = pageTitle(exprEl.value, baseNote, errEl.textContent ?? '', lang);
+  setHyperAvailable(!hyperEl.disabled);
+  try {
+    localStorage.setItem('schlaf-lang', lang);
+  } catch {}
+  syncUrl();
+}
+
+function stateParams(): URLSearchParams {
+  const result = new URLSearchParams();
+  result.set('s', exprEl.value);
+  result.set('lang', currentLang);
+  if (projEl.value === 'stereographic') result.set('proj', 'stereographic');
+  if (hyperEl.checked) result.set('hyper', '1');
+  if (!spinEl.checked) result.set('spin', '0');
+  if (!showFacesEl.checked) result.set('faces', '0');
+  if (!showEdgesEl.checked) result.set('edges', '0');
+  if (rangeEl.value !== '3') result.set('range', rangeEl.value);
+  for (const [el, name] of [[xwEl, 'xw'], [ywEl, 'yw'], [zwEl, 'zw']] as [HTMLInputElement, string][]) {
+    const value = Number(el.value);
+    if (Math.abs(value) > 1e-6) result.set(name, value.toFixed(2));
+  }
+  if (faceColorEl.value.toLowerCase() !== '#1d5fbf') result.set('face', faceColorEl.value);
+  if (Math.abs(Number(faceOpacityEl.value) - 0.55) > 1e-6) {
+    result.set('opacity', Number(faceOpacityEl.value).toFixed(2));
+  }
+  result.set('cam', [camera.position.x, camera.position.y, camera.position.z].map((value) => value.toFixed(2)).join(','));
+  if (controls.target.lengthSq() > 1e-6) {
+    result.set('target', [controls.target.x, controls.target.y, controls.target.z].map((value) => value.toFixed(2)).join(','));
+  }
+  return result;
+}
+
+function shareUrl(): string {
+  const url = new URL(location.href);
+  url.search = stateParams().toString();
+  url.hash = '';
+  return url.toString();
+}
+
+function syncUrl() {
+  try {
+    history.replaceState(null, '', shareUrl());
+  } catch {}
+}
+
+async function copyShareLink() {
+  const url = shareUrl();
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(url);
+    copied = true;
+  } catch {
+    const area = document.createElement('textarea');
+    area.value = url;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    try {
+      copied = document.execCommand('copy');
+    } catch {}
+    area.remove();
+  }
+  const label = copied ? uiText('copied') : uiText('copyFailed');
+  copyLinkEl.textContent = label;
+  copyStatusEl.textContent = label;
+  window.clearTimeout(copyTimer);
+  copyTimer = window.setTimeout(() => {
+    copyLinkEl.textContent = uiText('copyLink');
+    copyStatusEl.textContent = '';
+  }, 1600);
+  if (copied) {
+    try {
+      history.replaceState(null, '', url);
+    } catch {}
+  }
+}
+
+function resetView() {
+  controls.target.set(0, 0, 0);
+  camera.position.set(0, 0.8, 6);
+  controls.update();
+  fitView();
+  syncUrl();
 }
 
 const OUTPUTS: [HTMLInputElement, string, (value: string) => string][] = [
@@ -289,13 +479,33 @@ for (const [el, id, format] of OUTPUTS) {
   sync();
 }
 
-exprEl.oninput = rebuild;
-projEl.onchange = () => { fitView(); };
+exprEl.oninput = () => { rebuild(); syncUrl(); };
+projEl.onchange = () => { fitView(); syncUrl(); };
 rangeEl.oninput = rebuild;
-for (const el of [xwEl, ywEl, zwEl]) el.oninput = () => {};
+rangeEl.addEventListener('change', syncUrl);
+for (const el of [xwEl, ywEl, zwEl]) {
+  el.oninput = () => {};
+  el.addEventListener('change', syncUrl);
+}
+spinEl.addEventListener('change', syncUrl);
+showFacesEl.addEventListener('change', syncUrl);
+showEdgesEl.addEventListener('change', syncUrl);
+hyperEl.addEventListener('change', syncUrl);
+faceColorEl.addEventListener('change', syncUrl);
+faceOpacityEl.addEventListener('change', syncUrl);
+copyLinkEl.addEventListener('click', copyShareLink);
+resetViewEl.addEventListener('click', resetView);
+for (const button of document.querySelectorAll<HTMLButtonElement>('.lang-switch button')) {
+  button.addEventListener('click', () => {
+    const lang = button.dataset.lang;
+    if (lang === 'en' || lang === 'ko') applyLanguage(lang);
+  });
+}
 (function loop() {
   if (spinEl.checked) angle += 0.01;
   frame();
   requestAnimationFrame(loop);
 })();
+applyLanguage(initialLang);
 rebuild();
+syncUrl();

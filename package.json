@@ -1,6 +1,6 @@
 {
   "name": "schlaf",
-  "version": "0.1.0",
+  "version": "0.0.2",
   "description": "Schlafli symbol renderer for any dimension - Euclidean, spherical, hyperbolic",
   "type": "module",
   "scripts": {
@@ -9,7 +9,11 @@
     "preview": "vite preview",
     "test": "vitest run"
   },
-  "keywords": ["schlafli", "polytope", "visualization"],
+  "keywords": [
+    "schlafli",
+    "polytope",
+    "visualization"
+  ],
   "devDependencies": {
     "@types/node": "^26.6.6",
     "@types/three": "^0.187.0",

@@ -13,7 +13,7 @@ const CAP_RINGS = 4;
 
 export function validateExists(base: SchlafliNum[], key: string): void {
   const fail = (): never => {
-    throw new Error(`존재하지 않는 도형입니다: {${key}}`);
+    throw new Error(`shape does not exist: {${key}}`);
   };
   const nums: number[] = [];
   for (const b of base) {

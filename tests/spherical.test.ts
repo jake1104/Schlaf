@@ -90,6 +90,6 @@ describe('spherical tilings', () => {
 
 describe('nonexistent symbols', () => {
   it.each(['{1,3}', '{3,1}', '{1,1}', '{4,0}', '{5/0}', '{0,3}'])('%s does not exist', (s) => {
-    expect(() => buildGeometry(s)).toThrow(/존재하지 않/);
+    expect(() => buildGeometry(s)).toThrow(/does not exist/);
   });
 });

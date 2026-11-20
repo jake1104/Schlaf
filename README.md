@@ -1,5 +1,7 @@
 # Schlaf — Schläfli renderer (static)
 
+**English** | [한국어](README.ko.md)
+
 Type a Schläfli symbol, get the polytope. Any dimension, Euclidean / spherical / hyperbolic, perspective / stereographic projection, convex / concave.
 
 ## Syntax
@@ -136,6 +138,12 @@ rhombicosidodecahedron (120 / 180), `tr{3,3}` the truncated octahedron,
 ## Controls
 
 Left-drag rotates the projected 3D view, wheel zooms, right-drag pans. XW / YW / ZW sliders rotate higher-dimensional planes. Face color, opacity, face/edge toggles are in the side panel.
+
+**Reset view** re-frames the current polytope. **Copy link** copies the complete view state (symbol, projection, hyperbolic lift, toggles, range, higher-dimensional angles, face color, opacity, and camera) as a URL.
+
+## Languages
+
+The interface is available in English (default) and Korean. Use the **EN / KO** switch in the header; the choice is stored in `localStorage`. Add `?lang=ko` or `?lang=en` to the URL to override it.
 
 ## Spherical tilings
 
