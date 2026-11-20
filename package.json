@@ -2,6 +2,7 @@
   "name": "schlaf",
   "version": "0.0.2",
   "description": "Schlafli symbol renderer for any dimension - Euclidean, spherical, hyperbolic",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
